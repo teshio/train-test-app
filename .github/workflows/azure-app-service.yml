@@ -66,11 +66,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: backend-package
-          path: deploy
+          path: .
 
       - name: Deploy To Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ vars.AZURE_APP_SERVICE_NAME }}
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
-          package: deploy
+          package: .
