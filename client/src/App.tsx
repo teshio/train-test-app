@@ -73,6 +73,12 @@ type DeparturesResponse = {
   services: DepartureService[]
 }
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
+
+function getApiUrl(path: string) {
+  return API_BASE_URL ? `${API_BASE_URL}${path}` : path
+}
+
 function App() {
   const [from, setFrom] = useState<Station | null>(() => {
     const target = 'warrington bank quay'
@@ -98,7 +104,7 @@ function App() {
 
     try {
       const res = await fetch(
-        `/api/departures?from=${encodeURIComponent(from.crs)}&to=${encodeURIComponent(
+        `${getApiUrl('/api/departures')}?from=${encodeURIComponent(from.crs)}&to=${encodeURIComponent(
           to.crs,
         )}&rows=12`,
       )
