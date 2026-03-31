@@ -8,7 +8,9 @@ type StationMapProps = {
   highlightedStations?: Station[]
 }
 
-type ProjectedStation = Station & {
+type ProjectedStation = Omit<Station, 'lat' | 'long'> & {
+  lat: number
+  long: number
   x: number
   y: number
 }

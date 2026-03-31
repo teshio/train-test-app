@@ -351,7 +351,11 @@ function App() {
                                         {station.crs ? ` (${station.crs})` : ''}
                                       </span>
                                       <span className="font-mono">
-                                        {station.at ? `Act ${station.at}` : station.st ? `Sched ${station.st}` : '—'}
+                                        {'at' in station && station.at
+                                          ? `Act ${station.at}`
+                                          : 'st' in station && station.st
+                                            ? `Sched ${station.st}`
+                                            : '—'}
                                       </span>
                                     </div>
                                   ))}
