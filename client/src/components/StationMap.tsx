@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { MapPinned, Search, Train } from 'lucide-react'
+import { MapPinned, Minus, Plus, Search, Train } from 'lucide-react'
 import { type Station } from '../data/stations'
 import { GREAT_BRITAIN_OUTLINE } from '../data/greatBritainOutline'
 import { Button } from './ui/button'
@@ -42,6 +42,16 @@ type ProjectionBounds = {
   maxLat: number
   minLong: number
   maxLong: number
+}
+
+type City = GeoPoint & {
+  name: string
+  minScale?: number
+}
+
+type ProjectedCity = City & {
+  x: number
+  y: number
 }
 
 const VIEWBOX_WIDTH = 760
@@ -121,6 +131,56 @@ const OUTER_HEBRIDES_OUTLINE: GeoPoint[] = [
   { lat: 55.74, long: -6.84 },
 ]
 
+const MAJOR_UK_CITIES: City[] = [
+  { name: 'London', lat: 51.5072, long: -0.1276, minScale: 1 },
+  { name: 'Birmingham', lat: 52.4862, long: -1.8904, minScale: 1 },
+  { name: 'Manchester', lat: 53.4808, long: -2.2426, minScale: 1 },
+  { name: 'Liverpool', lat: 53.4084, long: -2.9916, minScale: 1 },
+  { name: 'Leeds', lat: 53.8008, long: -1.5491, minScale: 1 },
+  { name: 'Newcastle', lat: 54.9783, long: -1.6178, minScale: 1 },
+  { name: 'Glasgow', lat: 55.8642, long: -4.2518, minScale: 1 },
+  { name: 'Edinburgh', lat: 55.9533, long: -3.1883, minScale: 1 },
+  { name: 'Bristol', lat: 51.4545, long: -2.5879, minScale: 1 },
+  { name: 'Cardiff', lat: 51.4816, long: -3.1791, minScale: 1 },
+  { name: 'Sheffield', lat: 53.3811, long: -1.4701, minScale: 1.4 },
+  { name: 'Nottingham', lat: 52.9548, long: -1.1581, minScale: 1.4 },
+  { name: 'Leicester', lat: 52.6369, long: -1.1398, minScale: 1.4 },
+  { name: 'Southampton', lat: 50.9097, long: -1.4044, minScale: 1.4 },
+  { name: 'Belfast', lat: 54.5973, long: -5.9301, minScale: 1.4 },
+  { name: 'Oxford', lat: 51.752, long: -1.2577, minScale: 1.9 },
+  { name: 'Cambridge', lat: 52.2053, long: 0.1218, minScale: 1.9 },
+  { name: 'Reading', lat: 51.4543, long: -0.9781, minScale: 1.9 },
+  { name: 'Norwich', lat: 52.6309, long: 1.2974, minScale: 1.9 },
+  { name: 'Brighton', lat: 50.8225, long: -0.1372, minScale: 1.9 },
+  { name: 'Portsmouth', lat: 50.8198, long: -1.088, minScale: 1.9 },
+  { name: 'Plymouth', lat: 50.3755, long: -4.1427, minScale: 1.9 },
+  { name: 'Exeter', lat: 50.7184, long: -3.5339, minScale: 1.9 },
+  { name: 'Hull', lat: 53.7676, long: -0.3274, minScale: 1.9 },
+  { name: 'York', lat: 53.96, long: -1.0873, minScale: 1.9 },
+  { name: 'Preston', lat: 53.7632, long: -2.7031, minScale: 1.9 },
+  { name: 'Derby', lat: 52.9225, long: -1.4746, minScale: 1.9 },
+  { name: 'Stoke', lat: 53.0027, long: -2.1794, minScale: 1.9 },
+  { name: 'Swansea', lat: 51.6214, long: -3.9436, minScale: 1.9 },
+  { name: 'Aberdeen', lat: 57.1497, long: -2.0943, minScale: 1.9 },
+  { name: 'Dundee', lat: 56.462, long: -2.9707, minScale: 1.9 },
+  { name: 'Inverness', lat: 57.4778, long: -4.2247, minScale: 1.9 },
+  { name: 'Coventry', lat: 52.4068, long: -1.5197, minScale: 2.5 },
+  { name: 'Milton Keynes', lat: 52.0406, long: -0.7594, minScale: 2.5 },
+  { name: 'Luton', lat: 51.8787, long: -0.4200, minScale: 2.5 },
+  { name: 'Peterborough', lat: 52.5695, long: -0.2405, minScale: 2.5 },
+  { name: 'Chelmsford', lat: 51.7356, long: 0.4685, minScale: 2.5 },
+  { name: 'Canterbury', lat: 51.2802, long: 1.0789, minScale: 2.5 },
+  { name: 'Bath', lat: 51.3811, long: -2.359, minScale: 2.5 },
+  { name: 'Gloucester', lat: 51.8642, long: -2.2382, minScale: 2.5 },
+  { name: 'Worcester', lat: 52.192, long: -2.2200, minScale: 2.5 },
+  { name: 'Shrewsbury', lat: 52.7073, long: -2.7553, minScale: 2.5 },
+  { name: 'Lancaster', lat: 54.047, long: -2.8012, minScale: 2.5 },
+  { name: 'Carlisle', lat: 54.8925, long: -2.9329, minScale: 2.5 },
+  { name: 'Middlesbrough', lat: 54.5742, long: -1.2350, minScale: 2.5 },
+  { name: 'Sunderland', lat: 54.9069, long: -1.3838, minScale: 2.5 },
+  { name: 'Perth', lat: 56.3949, long: -3.4308, minScale: 2.5 },
+]
+
 const validStations = (stations: Station[]) =>
   stations.filter(
     (station): station is Station & { lat: number; long: number } =>
@@ -178,6 +238,13 @@ function projectStations(stations: Station[], bounds: ProjectionBounds): Project
   return validStations(stations).map((station) => ({
     ...station,
     ...projectGeoPoint({ lat: station.lat, long: station.long }, bounds),
+  }))
+}
+
+function projectCities(cities: City[], bounds: ProjectionBounds): ProjectedCity[] {
+  return cities.map((city) => ({
+    ...city,
+    ...projectGeoPoint(city, bounds),
   }))
 }
 
@@ -245,6 +312,10 @@ export function StationMap({ stations, highlightedStations = [] }: StationMapPro
   const projectedStations = React.useMemo(
     () => projectStations(stations, projectionBounds),
     [projectionBounds, stations],
+  )
+  const projectedCities = React.useMemo(
+    () => projectCities(MAJOR_UK_CITIES, projectionBounds),
+    [projectionBounds],
   )
   const gbPath = React.useMemo(
     () => buildOutlinePath(GREAT_BRITAIN_OUTLINE, projectionBounds),
@@ -316,16 +387,19 @@ export function StationMap({ stations, highlightedStations = [] }: StationMapPro
     }
   }, [])
 
-  const zoomAroundPoint = React.useCallback((nextScale: number, point: { x: number; y: number }) => {
-    const scaleToApply = clamp(nextScale, MIN_SCALE, MAX_SCALE)
-
+  const zoomAroundPoint = React.useCallback((zoomFactor: number, point: { x: number; y: number }) => {
     setScale((currentScale) => {
+      const scaleToApply = clamp(currentScale * zoomFactor, MIN_SCALE, MAX_SCALE)
       if (Math.abs(scaleToApply - currentScale) < 0.0001) return currentScale
+      const viewCenter = {
+        x: VIEWBOX_WIDTH / 2,
+        y: VIEWBOX_HEIGHT / 2,
+      }
 
-      setPan((currentPan) =>
+      setPan(() =>
         clampPan(scaleToApply, {
-          x: point.x - ((point.x - currentPan.x) / currentScale) * scaleToApply,
-          y: point.y - ((point.y - currentPan.y) / currentScale) * scaleToApply,
+          x: viewCenter.x - point.x * scaleToApply,
+          y: viewCenter.y - point.y * scaleToApply,
         }),
       )
 
@@ -341,9 +415,9 @@ export function StationMap({ stations, highlightedStations = [] }: StationMapPro
       if (!point) return
 
       const zoomFactor = event.deltaY < 0 ? 1.18 : 1 / 1.18
-      zoomAroundPoint(scale * zoomFactor, point)
+      zoomAroundPoint(zoomFactor, point)
     },
-    [clientToSvgPoint, scale, zoomAroundPoint],
+    [clientToSvgPoint, zoomAroundPoint],
   )
 
   const handlePointerDown = React.useCallback(
@@ -393,6 +467,16 @@ export function StationMap({ stations, highlightedStations = [] }: StationMapPro
     setScale(1)
     setPan({ x: 0, y: 0 })
   }, [])
+
+  const zoomFromCenter = React.useCallback(
+    (zoomFactor: number) => {
+      zoomAroundPoint(zoomFactor, {
+        x: VIEWBOX_WIDTH / 2,
+        y: VIEWBOX_HEIGHT / 2,
+      })
+    },
+    [zoomAroundPoint],
+  )
 
   return (
     <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.8fr)_280px]">
@@ -449,7 +533,7 @@ export function StationMap({ stations, highlightedStations = [] }: StationMapPro
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-[rgba(7,12,20,0.78)] p-2 backdrop-blur">
+              <div className="pointer-events-auto flex items-center gap-2 rounded-2xl border border-white/10 bg-[rgba(7,12,20,0.78)] p-2 backdrop-blur">
                 <div className="px-2 text-right">
                   <div className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
                     Zoom
@@ -458,8 +542,30 @@ export function StationMap({ stations, highlightedStations = [] }: StationMapPro
                     {scale.toFixed(scale < 2 ? 1 : 2)}x
                   </div>
                 </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => zoomFromCenter(1.18)}
+                  aria-label="Zoom in"
+                  title="Zoom in"
+                  className="h-9 w-9"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => zoomFromCenter(1 / 1.18)}
+                  aria-label="Zoom out"
+                  title="Zoom out"
+                  className="h-9 w-9"
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
                 <Button type="button" variant="outline" size="sm" onClick={resetView}>
-                  Reset view
+                  Reset
                 </Button>
               </div>
             </div>
@@ -612,9 +718,56 @@ export function StationMap({ stations, highlightedStations = [] }: StationMapPro
                   ))}
                 </g>
 
+                <g opacity="0.46">
+                  {projectedCities
+                    .filter((city) => scale >= (city.minScale ?? 1))
+                    .map((city) => {
+                    const cityMarkerSize = 4.8 / scale
+                    const cityStrokeWidth = 1.1 / scale
+                    const cityFontSize = 9 / scale
+
+                    return (
+                      <g key={city.name} pointerEvents="none">
+                        <line
+                          x1={city.x - cityMarkerSize}
+                          y1={city.y - cityMarkerSize}
+                          x2={city.x + cityMarkerSize}
+                          y2={city.y + cityMarkerSize}
+                          stroke="rgba(214, 224, 238, 0.45)"
+                          strokeWidth={cityStrokeWidth}
+                          strokeLinecap="round"
+                        />
+                        <line
+                          x1={city.x - cityMarkerSize}
+                          y1={city.y + cityMarkerSize}
+                          x2={city.x + cityMarkerSize}
+                          y2={city.y - cityMarkerSize}
+                          stroke="rgba(214, 224, 238, 0.45)"
+                          strokeWidth={cityStrokeWidth}
+                          strokeLinecap="round"
+                        />
+                        <text
+                          x={city.x + 6 / scale}
+                          y={city.y - 6 / scale}
+                          fill="rgba(228, 238, 252, 0.62)"
+                          fontSize={cityFontSize}
+                          fontWeight="600"
+                          letterSpacing={0.4 / scale}
+                        >
+                          {city.name}
+                        </text>
+                      </g>
+                    )
+                  })}
+                </g>
+
                 {projectedStations.map((station) => {
                   const isHighlighted = highlightedCrs.has(station.crs)
                   const isHovered = hovered?.station.crs === station.crs
+                  const markerRadius = (isHighlighted ? 3.4 : isHovered ? 2.35 : 1.15) / scale
+                  const markerRingRadius = (isHighlighted ? 6.2 : 4.25) / scale
+                  const markerRingWidth = 1.2 / scale
+                  const hitRadius = 8 / scale
 
                   return (
                     <g
@@ -639,7 +792,13 @@ export function StationMap({ stations, highlightedStations = [] }: StationMapPro
                       <circle
                         cx={station.x}
                         cy={station.y}
-                        r={isHighlighted ? 6 : isHovered ? 4.1 : 1.8}
+                        r={hitRadius}
+                        fill="transparent"
+                      />
+                      <circle
+                        cx={station.x}
+                        cy={station.y}
+                        r={markerRadius}
                         fill={
                           isHighlighted
                             ? 'rgba(255, 122, 164, 0.95)'
@@ -654,14 +813,14 @@ export function StationMap({ stations, highlightedStations = [] }: StationMapPro
                         <circle
                           cx={station.x}
                           cy={station.y}
-                          r={isHighlighted ? 11 : 7.5}
+                          r={markerRingRadius}
                           fill="none"
                           stroke={
                             isHighlighted
                               ? 'rgba(255, 122, 164, 0.42)'
                               : 'rgba(138, 227, 255, 0.32)'
                           }
-                          strokeWidth="1.6"
+                          strokeWidth={markerRingWidth}
                         />
                       )}
                     </g>
