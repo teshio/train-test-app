@@ -1,6 +1,8 @@
 import * as React from 'react'
-import { MapPinned, Navigation, Search, Train } from 'lucide-react'
+import { MapPinned, Search, Train } from 'lucide-react'
 import { type Station } from '../data/stations'
+import { GREAT_BRITAIN_OUTLINE } from '../data/greatBritainOutline'
+import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 
 type StationMapProps = {
@@ -49,54 +51,6 @@ const MIN_SCALE = 1
 const MAX_SCALE = 10
 const PAN_MARGIN = 96
 
-const GREAT_BRITAIN_OUTLINE: GeoPoint[] = [
-  { lat: 50.10, long: -5.82 },
-  { lat: 50.24, long: -5.10 },
-  { lat: 50.36, long: -4.48 },
-  { lat: 50.55, long: -3.92 },
-  { lat: 50.68, long: -3.18 },
-  { lat: 50.78, long: -2.42 },
-  { lat: 50.92, long: -1.52 },
-  { lat: 50.86, long: -0.52 },
-  { lat: 51.02, long: 0.32 },
-  { lat: 51.20, long: 1.35 },
-  { lat: 51.62, long: 1.68 },
-  { lat: 52.12, long: 1.56 },
-  { lat: 52.64, long: 1.42 },
-  { lat: 53.18, long: 0.92 },
-  { lat: 53.64, long: 0.42 },
-  { lat: 54.18, long: -0.08 },
-  { lat: 54.78, long: -0.26 },
-  { lat: 55.34, long: -1.08 },
-  { lat: 55.92, long: -1.82 },
-  { lat: 56.26, long: -2.52 },
-  { lat: 56.74, long: -3.18 },
-  { lat: 57.16, long: -4.02 },
-  { lat: 57.46, long: -4.72 },
-  { lat: 57.82, long: -5.48 },
-  { lat: 58.16, long: -5.32 },
-  { lat: 58.38, long: -4.62 },
-  { lat: 58.42, long: -3.62 },
-  { lat: 58.18, long: -2.42 },
-  { lat: 57.72, long: -2.02 },
-  { lat: 57.18, long: -1.54 },
-  { lat: 56.62, long: -2.08 },
-  { lat: 56.18, long: -2.88 },
-  { lat: 55.72, long: -3.28 },
-  { lat: 55.28, long: -3.08 },
-  { lat: 54.86, long: -2.64 },
-  { lat: 54.42, long: -3.24 },
-  { lat: 54.06, long: -3.12 },
-  { lat: 53.72, long: -3.12 },
-  { lat: 53.32, long: -3.48 },
-  { lat: 52.94, long: -4.06 },
-  { lat: 52.44, long: -4.44 },
-  { lat: 51.92, long: -4.78 },
-  { lat: 51.42, long: -4.98 },
-  { lat: 50.98, long: -4.62 },
-  { lat: 50.52, long: -4.92 },
-  { lat: 50.10, long: -5.82 },
-]
 
 const IRELAND_OUTLINE: GeoPoint[] = [
   { lat: 51.42, long: -10.42 },
@@ -227,7 +181,7 @@ function projectStations(stations: Station[], bounds: ProjectionBounds): Project
   }))
 }
 
-function buildOutlinePath(points: GeoPoint[], bounds: ProjectionBounds) {
+function buildOutlinePath(points: readonly GeoPoint[], bounds: ProjectionBounds) {
   return points
     .map((point, index) => {
       const projected = projectGeoPoint(point, bounds)
@@ -325,6 +279,7 @@ export function StationMap({ stations, highlightedStations = [] }: StationMapPro
     [highlightedStations],
   )
   const highlightedProjected = projectedStations.filter((station) => highlightedCrs.has(station.crs))
+  const highlightedList = highlightedProjected.map((station) => `${station.name} (${station.crs})`)
 
   const [hovered, setHovered] = React.useState<HoveredStation | null>(null)
   const [scale, setScale] = React.useState(1)
@@ -440,40 +395,78 @@ export function StationMap({ stations, highlightedStations = [] }: StationMapPro
   }, [])
 
   return (
-    <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_320px]">
-      <Card className="glow overflow-hidden border-border/60 bg-background/20">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <MapPinned className="h-5 w-5 text-primary" />
-            UK Station Map
-          </CardTitle>
-          <div className="text-sm text-muted-foreground">
-            Hover or focus a station to inspect it. Highlighted markers show the stations currently selected in search.
+    <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.8fr)_280px]">
+      <Card className="glow overflow-hidden border-border/60 bg-background/30">
+        <CardHeader className="gap-4 border-b border-border/50 pb-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="space-y-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-primary/75">
+                Network View
+              </div>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <MapPinned className="h-5 w-5 text-primary" />
+                UK station map
+              </CardTitle>
+              <div className="max-w-2xl text-sm text-muted-foreground">
+                A cleaner national overview of the rail dataset. Hover any marker for context,
+                and highlighted stations stay pinned to your current search.
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 text-xs">
+              <div className="rounded-full border border-border/60 bg-background/30 px-3 py-1.5 text-muted-foreground">
+                <span className="font-semibold text-foreground">
+                  {stationCount.toLocaleString()}
+                </span>{' '}
+                stations
+              </div>
+              <div className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-primary">
+                <span className="font-semibold">{highlightedProjected.length}</span> highlighted
+              </div>
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="mb-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <Search className="h-3.5 w-3.5 text-primary" />
-              Scroll to zoom. Left-click and drag to pan.
-            </div>
-            <button
-              type="button"
-              onClick={resetView}
-              className="rounded-full border border-border/60 bg-background/10 px-3 py-1.5 font-medium text-foreground transition hover:border-primary/40 hover:bg-background/20"
-            >
-              Reset view
-            </button>
-          </div>
 
+        <CardContent className="pt-5">
           <div
-            className="relative overflow-hidden rounded-3xl border border-border/60 bg-[radial-gradient(circle_at_top,rgba(120,220,255,0.12),transparent_30%),linear-gradient(180deg,rgba(8,12,20,0.96),rgba(4,6,12,0.98))] p-3 overscroll-none"
+            className="relative overflow-hidden rounded-[28px] border border-border/60 bg-[radial-gradient(circle_at_top,rgba(142,212,255,0.12),transparent_26%),linear-gradient(180deg,rgba(10,16,27,0.98),rgba(5,9,17,1))] overscroll-none"
             onWheelCapture={handleWheel}
           >
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 p-4">
+              <div className="rounded-2xl border border-white/10 bg-[rgba(7,12,20,0.78)] px-4 py-3 backdrop-blur">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/75">
+                  Legend
+                </div>
+                <div className="mt-2 space-y-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[rgba(188,204,224,0.82)]" />
+                    All mapped stations
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[rgba(255,122,164,0.95)]" />
+                    Current search selection
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-[rgba(7,12,20,0.78)] p-2 backdrop-blur">
+                <div className="px-2 text-right">
+                  <div className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
+                    Zoom
+                  </div>
+                  <div className="text-sm font-semibold text-foreground">
+                    {scale.toFixed(scale < 2 ? 1 : 2)}x
+                  </div>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={resetView}>
+                  Reset view
+                </Button>
+              </div>
+            </div>
             <svg
               ref={svgRef}
               viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
-              className={`h-auto w-full touch-none select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+              className={`h-auto min-h-[680px] w-full touch-none select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
               role="img"
               aria-label={`Map of the United Kingdom with ${stationCount} railway stations plotted`}
               onPointerDown={handlePointerDown}
@@ -483,118 +476,128 @@ export function StationMap({ stations, highlightedStations = [] }: StationMapPro
               onPointerCancel={endDrag}
             >
               <defs>
-                <radialGradient id="uk-water" cx="50%" cy="35%" r="75%">
-                  <stop offset="0%" stopColor="rgba(102, 220, 255, 0.22)" />
-                  <stop offset="100%" stopColor="rgba(8, 12, 20, 0)" />
-                </radialGradient>
-                <linearGradient id="uk-land" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="rgba(186, 201, 215, 0.16)" />
-                  <stop offset="100%" stopColor="rgba(82, 96, 118, 0.28)" />
+                <linearGradient id="uk-water" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(20, 33, 51, 0.96)" />
+                  <stop offset="100%" stopColor="rgba(4, 9, 17, 1)" />
                 </linearGradient>
+                <linearGradient id="uk-land" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(144, 158, 179, 0.28)" />
+                  <stop offset="100%" stopColor="rgba(70, 83, 102, 0.92)" />
+                </linearGradient>
+                <radialGradient id="stationHalo" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor="rgba(255,255,255,0.8)" />
+                  <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+                </radialGradient>
                 <filter id="stationGlow">
-                  <feGaussianBlur stdDeviation="4" result="blur" />
+                  <feGaussianBlur stdDeviation="3" result="blur" />
                   <feMerge>
                     <feMergeNode in="blur" />
                     <feMergeNode in="SourceGraphic" />
                   </feMerge>
                 </filter>
+                <pattern id="mapGrid" width="48" height="48" patternUnits="userSpaceOnUse">
+                  <path
+                    d="M 48 0 L 0 0 0 48"
+                    fill="none"
+                    stroke="rgba(190,204,224,0.06)"
+                    strokeWidth="1"
+                  />
+                </pattern>
               </defs>
 
               <rect width={VIEWBOX_WIDTH} height={VIEWBOX_HEIGHT} fill="url(#uk-water)" />
+              <rect width={VIEWBOX_WIDTH} height={VIEWBOX_HEIGHT} fill="url(#mapGrid)" />
+              <rect
+                width={VIEWBOX_WIDTH}
+                height={VIEWBOX_HEIGHT}
+                fill="url(#stationHalo)"
+                opacity="0.16"
+              />
 
               <g transform={`matrix(${scale} 0 0 ${scale} ${pan.x} ${pan.y})`}>
-                <g opacity="0.3">
+                <g opacity="0.18">
                   <path
                     d={irelandPath}
-                    fill="rgba(193, 208, 222, 0.06)"
+                    fill="rgba(193, 208, 222, 0.04)"
+                    stroke="rgba(186, 201, 215, 0.08)"
+                    strokeWidth="9"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d={gbPath}
+                    fill="rgba(193, 208, 222, 0.04)"
                     stroke="rgba(186, 201, 215, 0.12)"
                     strokeWidth="10"
                     strokeLinejoin="round"
                   />
                   <path
-                    d={gbPath}
-                    fill="rgba(193, 208, 222, 0.06)"
-                    stroke="rgba(186, 201, 215, 0.18)"
-                    strokeWidth="11"
-                    strokeLinejoin="round"
-                  />
-                  <path
                     d={isleOfManPath}
-                    fill="rgba(193, 208, 222, 0.08)"
-                    stroke="rgba(186, 201, 215, 0.18)"
-                    strokeWidth="6"
+                    fill="rgba(193, 208, 222, 0.04)"
+                    stroke="rgba(186, 201, 215, 0.12)"
+                    strokeWidth="5"
                   />
                   <path
                     d={isleOfWightPath}
-                    fill="rgba(193, 208, 222, 0.08)"
-                    stroke="rgba(186, 201, 215, 0.18)"
-                    strokeWidth="6"
+                    fill="rgba(193, 208, 222, 0.04)"
+                    stroke="rgba(186, 201, 215, 0.12)"
+                    strokeWidth="5"
                   />
                   <path
                     d={shetlandPath}
-                    fill="rgba(193, 208, 222, 0.08)"
-                    stroke="rgba(186, 201, 215, 0.18)"
-                    strokeWidth="6"
+                    fill="rgba(193, 208, 222, 0.04)"
+                    stroke="rgba(186, 201, 215, 0.12)"
+                    strokeWidth="5"
                   />
                   <path
                     d={outerHebridesPath}
-                    fill="rgba(193, 208, 222, 0.08)"
-                    stroke="rgba(186, 201, 215, 0.18)"
-                    strokeWidth="6"
+                    fill="rgba(193, 208, 222, 0.04)"
+                    stroke="rgba(186, 201, 215, 0.12)"
+                    strokeWidth="5"
                   />
                 </g>
 
                 <g opacity="0.92">
                   <path
                     d={irelandPath}
-                    fill="rgba(64, 76, 95, 0.16)"
-                    stroke="rgba(177, 192, 208, 0.2)"
-                    strokeWidth="2.8"
+                    fill="rgba(66, 80, 98, 0.58)"
+                    stroke="rgba(194, 208, 228, 0.18)"
+                    strokeWidth="2.4"
                     strokeLinejoin="round"
                   />
                   <path
                     d={gbPath}
                     fill="url(#uk-land)"
-                    stroke="rgba(184, 202, 220, 0.5)"
-                    strokeWidth="3.4"
+                    stroke="rgba(210, 224, 242, 0.32)"
+                    strokeWidth="3"
                     strokeLinejoin="round"
                   />
                   <path
                     d={isleOfManPath}
-                    fill="rgba(82, 96, 118, 0.24)"
-                    stroke="rgba(177, 192, 208, 0.34)"
-                    strokeWidth="2.5"
+                    fill="rgba(82, 96, 118, 0.64)"
+                    stroke="rgba(194, 208, 228, 0.24)"
+                    strokeWidth="2.1"
                   />
                   <path
                     d={isleOfWightPath}
                     fill="url(#uk-land)"
-                    stroke="rgba(177, 192, 208, 0.45)"
-                    strokeWidth="2.5"
+                    stroke="rgba(194, 208, 228, 0.24)"
+                    strokeWidth="2"
                   />
                   <path
                     d={shetlandPath}
-                    fill="rgba(82, 96, 118, 0.24)"
-                    stroke="rgba(177, 192, 208, 0.34)"
-                    strokeWidth="2.4"
+                    fill="rgba(82, 96, 118, 0.64)"
+                    stroke="rgba(194, 208, 228, 0.24)"
+                    strokeWidth="2"
                   />
                   <path
                     d={outerHebridesPath}
                     fill="url(#uk-land)"
-                    stroke="rgba(177, 192, 208, 0.45)"
-                    strokeWidth="2.2"
+                    stroke="rgba(194, 208, 228, 0.24)"
+                    strokeWidth="1.8"
                   />
                 </g>
 
-                <g opacity="0.34">
-                  <text x="506" y="330" fill="rgba(184, 198, 215, 0.22)" fontSize="22" letterSpacing="5">
-                    NORTH SEA
-                  </text>
-                  <text x="76" y="600" fill="rgba(184, 198, 215, 0.18)" fontSize="18" letterSpacing="4">
-                    IRISH SEA
-                  </text>
-                </g>
-
-                <g opacity="0.22">
+                <g opacity="0.16">
                   {railSegments.map((segment) => (
                     <line
                       key={`${segment.from.crs}:${segment.to.crs}`}
@@ -602,8 +605,8 @@ export function StationMap({ stations, highlightedStations = [] }: StationMapPro
                       y1={segment.from.y}
                       x2={segment.to.x}
                       y2={segment.to.y}
-                      stroke="rgba(120, 220, 255, 0.24)"
-                      strokeWidth="1.15"
+                      stroke="rgba(111, 199, 255, 0.22)"
+                      strokeWidth="0.95"
                       strokeLinecap="round"
                     />
                   ))}
@@ -636,35 +639,34 @@ export function StationMap({ stations, highlightedStations = [] }: StationMapPro
                       <circle
                         cx={station.x}
                         cy={station.y}
-                        r={isHighlighted ? 6.5 : isHovered ? 3.8 : 2.1}
+                        r={isHighlighted ? 6 : isHovered ? 4.1 : 1.8}
                         fill={
                           isHighlighted
-                            ? 'rgba(255, 95, 170, 0.96)'
-                            : 'rgba(120, 220, 255, 0.92)'
+                            ? 'rgba(255, 122, 164, 0.95)'
+                            : isHovered
+                              ? 'rgba(138, 227, 255, 0.98)'
+                              : 'rgba(188, 204, 224, 0.82)'
                         }
-                        opacity={isHovered || isHighlighted ? 1 : 0.72}
-                        filter={
-                          isHighlighted || isHovered ? 'url(#stationGlow)' : undefined
-                        }
+                        opacity={isHovered || isHighlighted ? 1 : 0.78}
+                        filter={isHighlighted || isHovered ? 'url(#stationGlow)' : undefined}
                       />
                       {(isHighlighted || isHovered) && (
                         <circle
                           cx={station.x}
                           cy={station.y}
-                          r={isHighlighted ? 11.5 : 8}
+                          r={isHighlighted ? 11 : 7.5}
                           fill="none"
                           stroke={
                             isHighlighted
-                              ? 'rgba(255, 95, 170, 0.5)'
-                              : 'rgba(120, 220, 255, 0.38)'
+                              ? 'rgba(255, 122, 164, 0.42)'
+                              : 'rgba(138, 227, 255, 0.32)'
                           }
-                          strokeWidth="2"
+                          strokeWidth="1.6"
                         />
                       )}
                     </g>
                   )
                 })}
-
               </g>
 
               {hoveredStation && hoveredStationScreenPosition ? (
@@ -672,137 +674,128 @@ export function StationMap({ stations, highlightedStations = [] }: StationMapPro
                   transform={`translate(${clamp(
                     hoveredStationScreenPosition.x + 12,
                     14,
-                    VIEWBOX_WIDTH - 178,
+                    VIEWBOX_WIDTH - 204,
                   )},${clamp(
-                    hoveredStationScreenPosition.y - 70,
+                    hoveredStationScreenPosition.y - 78,
                     14,
-                    VIEWBOX_HEIGHT - 82,
+                    VIEWBOX_HEIGHT - 94,
                   )})`}
                   pointerEvents="none"
                 >
                   <rect
-                    width="164"
-                    height="64"
-                    rx="16"
-                    fill="rgba(6, 11, 20, 0.94)"
-                    stroke="rgba(120, 220, 255, 0.3)"
+                    width="190"
+                    height="72"
+                    rx="18"
+                    fill="rgba(7, 12, 20, 0.94)"
+                    stroke="rgba(166, 188, 214, 0.28)"
                   />
-                  <text x="12" y="24" fill="white" fontSize="11" fontWeight="700">
+                  <text x="14" y="26" fill="white" fontSize="11" fontWeight="700">
                     {hoveredStation.name}
                   </text>
-                  <text x="12" y="40" fill="rgba(184, 198, 215, 0.95)" fontSize="9">
+                  <text x="14" y="44" fill="rgba(184, 198, 215, 0.95)" fontSize="9">
                     CRS {hoveredStation.crs}
                   </text>
-                  <text x="12" y="54" fill="rgba(184, 198, 215, 0.84)" fontSize="8.5">
-                    {hoveredStation.lat.toFixed(4)}°, {hoveredStation.long.toFixed(4)}°
+                  <text x="14" y="60" fill="rgba(184, 198, 215, 0.84)" fontSize="8.5">
+                    Lat {hoveredStation.lat.toFixed(4)} / Lon {hoveredStation.long.toFixed(4)}
                   </text>
                 </g>
               ) : null}
-
-              <g pointerEvents="none">
-                <rect
-                  x="14"
-                  y="14"
-                  width="156"
-                  height="70"
-                  rx="18"
-                  fill="rgba(5, 9, 17, 0.78)"
-                  stroke="rgba(120, 220, 255, 0.18)"
-                />
-                <text x="28" y="40" fill="white" fontSize="14" fontWeight="700">
-                  Zoom {scale.toFixed(scale < 2 ? 1 : 2)}x
-                </text>
-                <text x="28" y="60" fill="rgba(184, 198, 215, 0.84)" fontSize="11">
-                  Wheel: zoom
-                </text>
-                <text x="28" y="76" fill="rgba(184, 198, 215, 0.84)" fontSize="11">
-                  Drag: pan
-                </text>
-              </g>
             </svg>
+
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-4">
+              <div className="rounded-2xl border border-white/10 bg-[rgba(7,12,20,0.72)] px-4 py-3 text-xs text-muted-foreground backdrop-blur">
+                <div className="flex items-center gap-2">
+                  <Search className="h-3.5 w-3.5 text-primary" />
+                  Scroll to zoom. Drag to pan.
+                </div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-[rgba(7,12,20,0.72)] px-4 py-3 text-right text-xs text-muted-foreground backdrop-blur">
+                <div>{railSegments.length.toLocaleString()} inferred links</div>
+                <div>National dataset view</div>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="space-y-4">
-        <Card className="glow border-border/60 bg-background/20">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Map Summary</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex items-start gap-3 rounded-2xl border border-border/60 bg-background/10 p-3">
-              <Train className="mt-0.5 h-4 w-4 text-primary" />
-              <div>
-                <div className="font-semibold text-foreground">
-                  {stationCount.toLocaleString()} stations plotted
-                </div>
-                <div className="text-muted-foreground">
-                  Every station with valid latitude and longitude from the bundled UK rail dataset.
-                </div>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 rounded-2xl border border-border/60 bg-background/10 p-3">
-              <Navigation className="mt-0.5 h-4 w-4 text-accent" />
-              <div>
-                <div className="font-semibold text-foreground">
-                  {highlightedProjected.length} highlighted
-                </div>
-                <div className="text-muted-foreground">
-                  {highlightedProjected.length
-                    ? highlightedProjected
-                        .map((station) => `${station.name} (${station.crs})`)
-                        .join(' and ')
-                    : 'Choose stations in Search to spotlight them here.'}
-                </div>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-border/60 bg-background/10 p-3 text-muted-foreground">
-              Current pan: {Math.round(pan.x)}, {Math.round(pan.y)}
-            </div>
-            <div className="rounded-2xl border border-border/60 bg-background/10 p-3 text-muted-foreground">
-              Inferred links: {railSegments.length.toLocaleString()}
-            </div>
-          </CardContent>
-        </Card>
+      <Card className="border-border/60 bg-background/20">
+        <CardHeader className="border-b border-border/50 pb-5">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-primary/75">
+            Inspector
+          </div>
+          <CardTitle className="text-base">Station details</CardTitle>
+        </CardHeader>
 
-        <Card className="border-border/60 bg-background/20">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Station Details</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <CardContent className="space-y-6 pt-5">
+          <div className="space-y-3">
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+              Focus
+            </div>
             {hoveredStation ? (
-              <div className="rounded-2xl border border-border/60 bg-background/10 p-4">
-                <div className="text-base font-semibold">{hoveredStation.name}</div>
-                <div className="mt-1 font-mono text-xs text-primary">
-                  {hoveredStation.crs}
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-xl border border-border/60 bg-background/10 p-3">
-                    <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                      Latitude
-                    </div>
-                    <div className="mt-1 font-semibold">
+              <div className="rounded-[24px] border border-border/60 bg-background/10 p-4">
+                <div className="text-base font-semibold text-foreground">{hoveredStation.name}</div>
+                <div className="mt-1 font-mono text-xs text-primary">{hoveredStation.crs}</div>
+                <div className="mt-4 grid gap-3 text-sm">
+                  <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/20 px-3 py-2">
+                    <span className="text-muted-foreground">Latitude</span>
+                    <span className="font-semibold text-foreground">
                       {hoveredStation.lat.toFixed(5)}
-                    </div>
+                    </span>
                   </div>
-                  <div className="rounded-xl border border-border/60 bg-background/10 p-3">
-                    <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                      Longitude
-                    </div>
-                    <div className="mt-1 font-semibold">
+                  <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/20 px-3 py-2">
+                    <span className="text-muted-foreground">Longitude</span>
+                    <span className="font-semibold text-foreground">
                       {hoveredStation.long.toFixed(5)}
-                    </div>
+                    </span>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="rounded-2xl border border-dashed border-border/60 bg-background/10 p-4 text-sm text-muted-foreground">
+              <div className="rounded-[24px] border border-dashed border-border/60 bg-background/10 p-4 text-sm text-muted-foreground">
                 Hover a station marker to inspect its name, CRS code, and coordinates.
               </div>
             )}
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+              Current search
+            </div>
+            {highlightedList.length ? (
+              <div className="space-y-2">
+                {highlightedList.map((station) => (
+                  <div
+                    key={station}
+                    className="rounded-2xl border border-primary/20 bg-primary/10 px-3 py-2 text-sm text-foreground"
+                  >
+                    {station}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-border/60 bg-background/10 px-3 py-3 text-sm text-muted-foreground">
+                Choose departure and arrival stations in Search to pin them on the map.
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+              Coverage
+            </div>
+            <div className="rounded-[24px] border border-border/60 bg-background/10 p-4 text-sm">
+              <div className="flex items-start gap-3">
+                <Train className="mt-0.5 h-4 w-4 text-primary" />
+                <div>
+                  <div className="font-semibold text-foreground">
+                    {stationCount.toLocaleString()} stations plotted
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

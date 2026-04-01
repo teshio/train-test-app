@@ -14,13 +14,21 @@ import {
 } from './ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 
+type InlineAction = {
+  label: string
+  onClick: () => void
+  icon: React.ReactNode
+  disabled?: boolean
+}
+
 export function StationCombobox({
   label,
   stations,
   value,
   onChange,
-  placeholder = 'Search station…',
+  placeholder = 'Search station...',
   className,
+  inlineAction,
 }: {
   label: string
   stations: Station[]
@@ -28,6 +36,7 @@ export function StationCombobox({
   onChange: (station: Station) => void
   placeholder?: string
   className?: string
+  inlineAction?: InlineAction
 }) {
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState('')
@@ -38,25 +47,41 @@ export function StationCombobox({
   )
 
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className="space-y-2">
       <div className="text-sm font-semibold text-foreground/90">{label}</div>
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className={cn(
-              'w-full justify-between rounded-2xl bg-background/35 backdrop-blur',
-              !value && 'text-muted-foreground',
-            )}
-          >
-            <span className="truncate">
-              {value ? `${value.name} (${value.crs})` : 'Select a station'}
-            </span>
-            <ChevronsUpDown className="h-4 w-4 opacity-70" />
-          </Button>
-        </PopoverTrigger>
+        <div className="relative">
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className={cn(
+                'w-full justify-start rounded-2xl bg-background/35 pr-12 backdrop-blur',
+                inlineAction && 'pr-24',
+                !value && 'text-muted-foreground',
+                className,
+              )}
+            >
+              <span className="flex-1 truncate text-left">
+                {value ? `${value.name} (${value.crs})` : 'Select a station'}
+              </span>
+            </Button>
+          </PopoverTrigger>
+          <ChevronsUpDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 opacity-70" />
+          {inlineAction ? (
+            <button
+              type="button"
+              onClick={inlineAction.onClick}
+              disabled={inlineAction.disabled}
+              aria-label={inlineAction.label}
+              title={inlineAction.label}
+              className="absolute right-10 top-1/2 z-10 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full border border-border/60 bg-background/70 text-muted-foreground transition hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {inlineAction.icon}
+            </button>
+          ) : null}
+        </div>
         <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-2 glow">
           <Command>
             <CommandInput
@@ -90,10 +115,6 @@ export function StationCombobox({
           </Command>
         </PopoverContent>
       </Popover>
-      <div className="text-xs text-muted-foreground">
-        Pick from the list so we can use the correct CRS code.
-      </div>
     </div>
   )
 }
-
