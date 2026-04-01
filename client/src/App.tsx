@@ -1,6 +1,7 @@
 import './App.css'
 import { ArrowUpDown, LoaderCircle, LocateFixed, Zap, Train } from 'lucide-react'
 import { useState } from 'react'
+import heroImage from './assets/hero.png'
 import { OperatorLogo } from './components/OperatorLogo'
 import { StationMap } from './components/StationMap'
 import { StationCombobox } from './components/StationCombobox'
@@ -74,6 +75,7 @@ type DeparturesResponse = {
 }
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
+const MIN_SEARCH_DIALOG_MS = 1500
 
 function getApiUrl(path: string) {
   return API_BASE_URL ? `${API_BASE_URL}${path}` : path
@@ -128,6 +130,7 @@ function App() {
     return STATIONS.find((s) => s.name.toLowerCase() === target) ?? null
   })
   const [loading, setLoading] = useState(false)
+  const [showSearchDialog, setShowSearchDialog] = useState(false)
   const [activeSection, setActiveSection] = useState<'search' | 'stationMap'>('search')
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<DeparturesResponse | null>(null)
@@ -140,7 +143,9 @@ function App() {
     }
     setError(null)
     setLoading(true)
+    setShowSearchDialog(true)
     setData(null)
+    const searchStart = Date.now()
 
     try {
       const res = await fetch(
@@ -165,6 +170,11 @@ function App() {
       setError(e instanceof Error ? e.message : 'Search failed')
     } finally {
       setLoading(false)
+      const elapsed = Date.now() - searchStart
+      const remaining = Math.max(0, MIN_SEARCH_DIALOG_MS - elapsed)
+      window.setTimeout(() => {
+        setShowSearchDialog(false)
+      }, remaining)
     }
   }
 
@@ -223,6 +233,35 @@ function App() {
 
   return (
     <div className="min-h-screen electric-bg text-foreground">
+      {showSearchDialog ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(3,6,12,0.72)] px-4 backdrop-blur-md">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Searching"
+            className="relative w-full max-w-2xl overflow-hidden rounded-[32px] border border-white/10 bg-[rgba(7,12,20,0.94)] shadow-[0_0_0_1px_rgba(120,220,255,0.08),0_24px_120px_rgba(0,0,0,0.45)]"
+          >
+            <div className="relative h-[320px] overflow-hidden">
+              <img
+                src={heroImage}
+                alt=""
+                className="h-full w-full scale-110 object-cover opacity-80"
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,10,18,0.18),rgba(4,10,18,0.78))]" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.08),transparent_55%)]" />
+              <div className="absolute inset-y-0 left-[-20%] w-[38%] skew-x-[-18deg] bg-[linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,0.18),rgba(255,255,255,0))] opacity-70 animate-[trainRush_1.1s_linear_infinite]" />
+
+              <div className="absolute inset-x-0 bottom-0 p-6">
+                <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-[rgba(7,12,20,0.76)] px-4 py-2 text-sm text-foreground backdrop-blur">
+                  <LoaderCircle className="h-4 w-4 animate-spin text-primary" />
+                  Waiting for the rail feed to return current services and calling points.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="mx-auto max-w-6xl px-4 py-6">
         <div className="mx-auto flex max-w-xl items-center justify-between">
           <div>

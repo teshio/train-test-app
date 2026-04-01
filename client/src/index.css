@@ -132,5 +132,14 @@
         box-shadow: 0 0 0 0 rgba(0, 229, 255, 0);
       }
     }
+
+    @keyframes trainRush {
+      0% {
+        transform: translateX(-18%) skewX(-18deg);
+      }
+      100% {
+        transform: translateX(360%) skewX(-18deg);
+      }
+    }
   }
 }
