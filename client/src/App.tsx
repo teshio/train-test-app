@@ -1,14 +1,13 @@
 import './App.css'
 import { ArrowUpDown, LoaderCircle, LocateFixed, Zap, Train } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import heroImage from './assets/hero.png'
 import { OperatorLogo } from './components/OperatorLogo'
-import { StationMap } from './components/StationMap'
+import { StationMap, type LiveServicePosition } from './components/StationMap'
 import { StationCombobox } from './components/StationCombobox'
 import { Button } from './components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
 import { STATIONS, type Station } from './data/stations'
-import { estimateFareGBP } from './lib/fare'
 import { cn } from './lib/utils'
 
 type DepartureService = {
@@ -74,7 +73,38 @@ type DeparturesResponse = {
   services: DepartureService[]
 }
 
+function toLiveServicePosition(service: DepartureService): LiveServicePosition | null {
+  const previousStops = service.previousCallingPoints?.[0]?.callingPoints ?? []
+  const originStops = service.origin ?? []
+  const resolvedPreviousStop =
+    [...previousStops].reverse().find((stop) => stop.crs)?.crs ??
+    [...originStops].reverse().find((stop) => stop.crs)?.crs
+  const nextStop = service.subsequentCallingPoints?.[0]?.callingPoints?.find((stop) => stop.crs)
+  const destinationName = service.destination?.[0]?.locationName
+  const label = destinationName
+    ? `${service.std ?? '--:--'} to ${destinationName}`
+    : service.std ?? 'Live service'
+
+  if (!resolvedPreviousStop && !nextStop?.crs) return null
+
+  return {
+    id: service.serviceID ?? service.rsid ?? `${service.std ?? 'service'}-${destinationName ?? 'unknown'}`,
+    label,
+    destination: destinationName,
+    previousCrs: resolvedPreviousStop,
+    nextCrs: nextStop?.crs,
+    nextStationName: nextStop?.locationName,
+    nextArrivalTime: nextStop?.et ?? nextStop?.st,
+    operator: service.operator,
+    etd: service.etd,
+    eta: service.eta,
+    sta: service.sta,
+    platform: service.platform,
+  }
+}
+
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
+const NATIONAL_RAIL_JOURNEY_PLANNER_URL = 'https://www.nationalrail.co.uk/journey-planner/'
 const MIN_SEARCH_DIALOG_MS = 1500
 
 function getApiUrl(path: string) {
@@ -135,6 +165,10 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<DeparturesResponse | null>(null)
   const [isLocatingFrom, setIsLocatingFrom] = useState(false)
+  const liveServicePositions = useMemo(
+    () => (data?.services ?? []).map(toLiveServicePosition).filter(Boolean) as LiveServicePosition[],
+    [data],
+  )
 
   async function onSearch() {
     if (!from || !to) {
@@ -146,6 +180,7 @@ function App() {
     setShowSearchDialog(true)
     setData(null)
     const searchStart = Date.now()
+    let nextData: DeparturesResponse | null = null
 
     try {
       const res = await fetch(
@@ -165,7 +200,7 @@ function App() {
           typeof errorResponse.message === 'string' ? errorResponse.message : ''
         throw new Error(detail ? `${base}: ${detail}` : base)
       }
-      setData(json as DeparturesResponse)
+      nextData = json as DeparturesResponse
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Search failed')
     } finally {
@@ -174,6 +209,7 @@ function App() {
       const remaining = Math.max(0, MIN_SEARCH_DIALOG_MS - elapsed)
       window.setTimeout(() => {
         setShowSearchDialog(false)
+        setData(nextData)
       }, remaining)
     }
   }
@@ -295,7 +331,7 @@ function App() {
           </div>
         </div>
 
-        <div className="mx-auto mt-4 inline-flex max-w-xl gap-2">
+        <div className="mx-auto mt-4 flex max-w-xl justify-center gap-2">
           <Button
             variant={activeSection === 'search' ? undefined : 'outline'}
             onClick={() => setActiveSection('search')}
@@ -312,7 +348,6 @@ function App() {
 
         {activeSection === 'search' && (
           <div className="mx-auto max-w-xl">
-            <div className="mt-4 text-sm font-semibold">Search</div>
             <Card className="mt-3 glow scanlines">
           <CardHeader>
             <CardTitle className="text-base">Where are you going?</CardTitle>
@@ -394,23 +429,53 @@ function App() {
                   : ''}
               </div>
             </div>
+            {data.filterLocationName || data.filtercrs ? (
+              <div className="text-xs text-muted-foreground">
+                Filtered toward {data.filterLocationName ?? 'Unknown'}
+                {data.filtercrs ? ` (${data.filtercrs})` : ''}
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-1 gap-3">
               {data.services.length === 0 ? (
                 <Card className="p-5 text-center text-sm text-muted-foreground">No services found.</Card>
-              ) : (
-                data.services.map((s) => (
-                  <Card key={s.serviceID ?? `${s.std}-${s.destination}`} className="glow">
-                    <CardContent className="p-4">
-                      <div className="grid grid-cols-[92px_1fr_72px] items-center gap-3">
+                ) : (
+                  data.services.map((s, index) => (
+                    <Card
+                      key={s.serviceID ?? `${s.std}-${s.destination}`}
+                      className={cn(
+                        'glow service-arrival',
+                        index % 2 === 0 ? 'service-arrival-left' : 'service-arrival-right',
+                      )}
+                      style={{ animationDelay: `${index * 90}ms` }}
+                    >
+                      <CardContent className="p-4">
+                        {(() => {
+                          const isDelayed = Boolean(s.etd && s.etd !== 'On time')
+                          const primaryDestination = s.destination?.[0]
+                          const primaryOrigin = s.origin?.[0]
+                          const viaText = primaryDestination?.via || primaryOrigin?.via || ''
+                          const callingPoints = s.subsequentCallingPoints?.[0]?.callingPoints ?? []
+                          const nextStop = callingPoints[0]
+                          const stopsRemaining = callingPoints.length
+                          const previousStops = s.previousCallingPoints?.[0]?.callingPoints ?? []
+                          const lastReportedStop = previousStops[previousStops.length - 1]
+
+                          return (
+                      <div className="grid grid-cols-[92px_1fr_92px] items-center gap-3">
                         <div>
-                          <div className="text-xl font-extrabold tracking-tight">
+                          <div
+                            className={cn(
+                              'text-xl font-extrabold tracking-tight',
+                              isDelayed && 'text-muted-foreground line-through decoration-2',
+                            )}
+                          >
                             {s.std ?? '--:--'}
                           </div>
                           <div
                             className={cn(
                               'text-xs text-muted-foreground',
-                              s.etd && s.etd !== 'On time' && 'text-accent font-semibold',
+                              isDelayed && 'text-accent font-semibold',
                             )}
                           >
                             {s.etd ?? ''}
@@ -423,10 +488,15 @@ function App() {
                         </div>
                         <div className="min-w-0">
                           <div className="truncate text-sm font-semibold">
-                            {(s.destination?.[0]?.locationName as string | undefined) ||
+                            {(primaryDestination?.locationName as string | undefined) ||
                               to?.name ||
                               ''}
                           </div>
+                          {viaText ? (
+                            <div className="truncate text-[11px] text-muted-foreground">
+                              Via {viaText}
+                            </div>
+                          ) : null}
                           <div className="mt-1 flex items-center gap-2">
                             <OperatorLogo operator={s.operator} operatorCode={s.operatorCode} />
                             <div className="min-w-0">
@@ -436,16 +506,48 @@ function App() {
                                   .join(' ')}
                               </div>
                               <div className="truncate text-[11px] text-muted-foreground">
-                                {from && to
-                                  ? (() => {
-                                      const est = estimateFareGBP(from, to)
-                                      return est == null
-                                        ? 'Est. fare: —'
-                                        : `Est. fare: £${est.toFixed(2)}`
-                                    })()
-                                  : 'Est. fare: —'}
+                                <a
+                                  href={NATIONAL_RAIL_JOURNEY_PLANNER_URL}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-primary underline decoration-primary/40 underline-offset-2 transition-colors hover:text-primary/80"
+                                >
+                                  Check live fare
+                                </a>
                               </div>
                             </div>
+                          </div>
+                          <div className="mt-2 grid gap-1 text-[11px] text-muted-foreground">
+                            {primaryOrigin?.locationName ? (
+                              <div className="truncate">
+                                Origin: <span className="text-foreground/90">{primaryOrigin.locationName}</span>
+                                {primaryOrigin.crs ? ` (${primaryOrigin.crs})` : ''}
+                              </div>
+                            ) : null}
+                            {nextStop?.locationName ? (
+                              <div className="truncate">
+                                Next stop: <span className="text-foreground/90">{nextStop.locationName}</span>
+                                {nextStop.crs ? ` (${nextStop.crs})` : ''}
+                                {nextStop.et ? ` · Exp ${nextStop.et}` : nextStop.st ? ` · Sched ${nextStop.st}` : ''}
+                              </div>
+                            ) : null}
+                            {stopsRemaining ? (
+                              <div>
+                                Stops remaining: <span className="text-foreground/90">{stopsRemaining}</span>
+                              </div>
+                            ) : null}
+                            {lastReportedStop?.locationName ? (
+                              <div className="truncate">
+                                Last reported: <span className="text-foreground/90">{lastReportedStop.locationName}</span>
+                                {'at' in lastReportedStop && lastReportedStop.at
+                                  ? ` · Act ${lastReportedStop.at}`
+                                  : 'et' in lastReportedStop && lastReportedStop.et
+                                    ? ` · Exp ${lastReportedStop.et}`
+                                    : 'st' in lastReportedStop && lastReportedStop.st
+                                      ? ` · Sched ${lastReportedStop.st}`
+                                      : ''}
+                              </div>
+                            ) : null}
                           </div>
                           <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
                             {s.serviceType ? (
@@ -463,6 +565,26 @@ function App() {
                                 Cancelled
                               </span>
                             ) : null}
+                            {s.detachFront ? (
+                              <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-0.5 text-amber-100">
+                                Front detaches
+                              </span>
+                            ) : null}
+                            {s.isCircularRoute ? (
+                              <span className="rounded-full border border-border/60 px-2 py-0.5">
+                                Circular route
+                              </span>
+                            ) : null}
+                            {s.delayReason ? (
+                              <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-primary">
+                                Delay reason
+                              </span>
+                            ) : null}
+                            {s.cancelReason ? (
+                              <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-primary">
+                                Cancellation reason
+                              </span>
+                            ) : null}
                           </div>
                         </div>
                         <div className="text-right">
@@ -470,14 +592,68 @@ function App() {
                           <div className="text-xl font-extrabold tracking-tight">
                             {s.platform ?? '—'}
                           </div>
+                          <div className="mt-1 text-[11px] text-muted-foreground">Cars</div>
+                          <div className="text-sm font-semibold tracking-tight text-foreground">
+                            {typeof s.length === 'number' ? s.length : '—'}
+                          </div>
                         </div>
                       </div>
+
+                          )
+                        })()}
 
                       <details className="mt-3 rounded-2xl border border-border/60 bg-background/20 px-3 py-2">
                         <summary className="cursor-pointer select-none text-xs font-semibold text-foreground/90">
                           Details
                         </summary>
                         <div className="mt-3 space-y-3 text-xs text-muted-foreground">
+                          <div className="rounded-xl border border-border/50 bg-background/10 p-3">
+                            <div className="mb-2 font-semibold text-foreground/90">Service snapshot</div>
+                            <div className="grid gap-2 text-[11px]">
+                              {s.rsid ? <div>RSID: <span className="font-mono text-foreground/90">{s.rsid}</span></div> : null}
+                              {s.serviceID ? (
+                                <div>
+                                  Service ID: <span className="font-mono text-foreground/90">{s.serviceID}</span>
+                                </div>
+                              ) : null}
+                              {data.filterLocationName || data.filtercrs ? (
+                                <div>
+                                  Filtered toward:{' '}
+                                  <span className="text-foreground/90">
+                                    {data.filterLocationName ?? 'Unknown'}
+                                    {data.filtercrs ? ` (${data.filtercrs})` : ''}
+                                  </span>
+                                </div>
+                              ) : null}
+                              {s.origin?.[0]?.locationName ? (
+                                <div>
+                                  Origin:{' '}
+                                  <span className="text-foreground/90">
+                                    {s.origin[0].locationName}
+                                    {s.origin[0].crs ? ` (${s.origin[0].crs})` : ''}
+                                  </span>
+                                </div>
+                              ) : null}
+                              {s.destination?.[0]?.locationName ? (
+                                <div>
+                                  Destination:{' '}
+                                  <span className="text-foreground/90">
+                                    {s.destination[0].locationName}
+                                    {s.destination[0].crs ? ` (${s.destination[0].crs})` : ''}
+                                  </span>
+                                </div>
+                              ) : null}
+                              {s.destination?.[0]?.via || s.origin?.[0]?.via ? (
+                                <div>
+                                  Via:{' '}
+                                  <span className="text-foreground/90">
+                                    {s.destination?.[0]?.via || s.origin?.[0]?.via}
+                                  </span>
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+
                           {s.delayReason ? (
                             <div>
                               <div className="font-semibold text-foreground/90">Delay reason</div>
@@ -490,6 +666,18 @@ function App() {
                                 Cancellation reason
                               </div>
                               <div>{s.cancelReason}</div>
+                            </div>
+                          ) : null}
+                          {s.detachFront ? (
+                            <div>
+                              <div className="font-semibold text-foreground/90">Formation note</div>
+                              <div>Front portion of this train detaches during the journey.</div>
+                            </div>
+                          ) : null}
+                          {s.isCircularRoute ? (
+                            <div>
+                              <div className="font-semibold text-foreground/90">Route pattern</div>
+                              <div>This service is marked as a circular route.</div>
                             </div>
                           ) : null}
 
@@ -579,7 +767,11 @@ function App() {
         )}
 
         {activeSection === 'stationMap' && (
-          <StationMap stations={STATIONS} highlightedStations={[from, to].filter(Boolean) as Station[]} />
+          <StationMap
+            stations={STATIONS}
+            highlightedStations={[from, to].filter(Boolean) as Station[]}
+            liveServices={liveServicePositions}
+          />
         )}
 
         <div className="mx-auto mt-6 max-w-xl text-xs text-muted-foreground">

@@ -6,3 +6,4 @@ server/node_modules/
 .env
 .env.*
 *.log
+tmp-network-rail-gis/
