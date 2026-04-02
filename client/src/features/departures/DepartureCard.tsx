@@ -26,11 +26,36 @@ type DepartureCardProps = {
   animationDirection: 'left' | 'right'
 }
 
+function normalizeCallingPointStatus(value?: string) {
+  return value?.trim().toLowerCase()
+}
+
+function formatCallingPointTiming(callingPoint: DepartureCallingPoint) {
+  const parts: string[] = []
+
+  if (callingPoint.st) {
+    parts.push(`Sched ${callingPoint.st}`)
+  }
+
+  if (callingPoint.et) {
+    const normalizedExpected = normalizeCallingPointStatus(callingPoint.et)
+    parts.push(
+      normalizedExpected === 'on time' ? 'On time' : `Exp ${callingPoint.et}`,
+    )
+  }
+
+  if (callingPoint.at) {
+    parts.push(`Act ${callingPoint.at}`)
+  }
+
+  return parts.join(' / ')
+}
+
 function formatPreviousStopTime(stop: DepartureLocation | DepartureCallingPoint) {
   if ('at' in stop && stop.at) return `Act ${stop.at}`
   if ('et' in stop && stop.et) return `Exp ${stop.et}`
   if ('st' in stop && stop.st) return `Sched ${stop.st}`
-  return '?'
+  return ''
 }
 
 function formatNextStopText(stop?: DepartureCallingPoint) {
@@ -78,6 +103,61 @@ export function DepartureCard({
   )
   const nextStopText = formatNextStopText(nextStop)
   const lastReportedText = formatLastReportedText(lastReportedStop)
+  const visibleFlags = [
+    service.serviceType && service.serviceType.toLowerCase() !== 'train'
+      ? {
+          key: `service-type-${service.serviceType}`,
+          className: 'rounded-full border border-border/60 px-3 py-1',
+          label: service.serviceType,
+        }
+      : null,
+    typeof service.length === 'number'
+      ? {
+          key: `length-${service.length}`,
+          className: 'rounded-full border border-border/60 px-3 py-1',
+          label: `${service.length} cars`,
+        }
+      : null,
+    service.isCancelled
+      ? {
+          key: 'cancelled',
+          className:
+            'rounded-full border border-destructive/50 bg-destructive/10 px-3 py-1 text-destructive-foreground',
+          label: 'Cancelled',
+        }
+      : null,
+    service.detachFront
+      ? {
+          key: 'detach-front',
+          className:
+            'rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1 text-amber-100',
+          label: 'Front detaches',
+        }
+      : null,
+    service.isCircularRoute
+      ? {
+          key: 'circular-route',
+          className: 'rounded-full border border-border/60 px-3 py-1',
+          label: 'Circular route',
+        }
+      : null,
+    service.delayReason
+      ? {
+          key: 'delay-reason',
+          className:
+            'rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-primary',
+          label: 'Delay reason',
+        }
+      : null,
+    service.cancelReason
+      ? {
+          key: 'cancel-reason',
+          className:
+            'rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-primary',
+          label: 'Cancellation reason',
+        }
+      : null,
+  ].filter(Boolean) as { key: string; className: string; label: string }[]
   const allPreviousStops: Array<DepartureLocation | DepartureCallingPoint> = previousStops.length
     ? previousStops
     : (service.origin ?? [])
@@ -146,7 +226,7 @@ export function DepartureCard({
                   Cars
                 </div>
                 <div className="text-xl font-bold tracking-tight text-foreground">
-                  {typeof service.length === 'number' ? service.length : '?'}
+                  {typeof service.length === 'number' ? service.length : '-'}
                 </div>
               </div>
             </div>
@@ -225,78 +305,49 @@ export function DepartureCard({
             </div>
 
             <div className="space-y-3">
-              <div className="rounded-2xl border border-border/60 bg-background/15 p-3">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                  Timing
+              {service.sta || service.eta || journeyTime ? (
+                <div className="rounded-2xl border border-border/60 bg-background/15 p-3">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                    Timing
+                  </div>
+                  <div className="mt-3 grid gap-2">
+                    {service.sta || service.eta ? (
+                      <div className="rounded-xl border border-border/50 bg-background/20 px-3 py-2">
+                        <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                          Arrival
+                        </div>
+                        <div className="mt-1 text-base font-semibold text-foreground">
+                          {service.sta ?? '--:--'}
+                          {service.eta ? ` / ${service.eta}` : ''}
+                        </div>
+                      </div>
+                    ) : null}
+                    {journeyTime ? (
+                      <div className="rounded-xl border border-border/50 bg-background/20 px-3 py-2">
+                        <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                          <Clock3 className="h-3.5 w-3.5 text-primary" />
+                          Journey Time
+                        </div>
+                        <div className="mt-1 text-base font-semibold text-foreground">
+                          {journeyTime}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
-                <div className="mt-3 grid gap-2">
-                  {service.sta || service.eta ? (
-                    <div className="rounded-xl border border-border/50 bg-background/20 px-3 py-2">
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                        Arrival
-                      </div>
-                      <div className="mt-1 text-base font-semibold text-foreground">
-                        {service.sta ?? '--:--'}
-                        {service.eta ? ` / ${service.eta}` : ''}
-                      </div>
-                    </div>
-                  ) : null}
-                  {journeyTime ? (
-                    <div className="rounded-xl border border-border/50 bg-background/20 px-3 py-2">
-                      <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                        <Clock3 className="h-3.5 w-3.5 text-primary" />
-                        Journey Time
-                      </div>
-                      <div className="mt-1 text-base font-semibold text-foreground">
-                        {journeyTime}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
+              ) : null}
 
-              <div className="rounded-2xl border border-border/60 bg-background/15 p-3">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                  Flags
+              {visibleFlags.length ? (
+                <div className="rounded-2xl border border-border/60 bg-background/15 p-3">
+                  <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                    {visibleFlags.map((flag) => (
+                      <span key={flag.key} className={flag.className}>
+                        {flag.label}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2 text-sm text-muted-foreground">
-                  {service.serviceType ? (
-                    <span className="rounded-full border border-border/60 px-3 py-1">
-                      {service.serviceType}
-                    </span>
-                  ) : null}
-                  {typeof service.length === 'number' ? (
-                    <span className="rounded-full border border-border/60 px-3 py-1">
-                      {service.length} cars
-                    </span>
-                  ) : null}
-                  {service.isCancelled ? (
-                    <span className="rounded-full border border-destructive/50 bg-destructive/10 px-3 py-1 text-destructive-foreground">
-                      Cancelled
-                    </span>
-                  ) : null}
-                  {service.detachFront ? (
-                    <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1 text-amber-100">
-                      Front detaches
-                    </span>
-                  ) : null}
-                  {service.isCircularRoute ? (
-                    <span className="rounded-full border border-border/60 px-3 py-1">
-                      Circular route
-                    </span>
-                  ) : null}
-                  {service.delayReason ? (
-                    <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-primary">
-                      Delay reason
-                    </span>
-                  ) : null}
-                  {service.cancelReason ? (
-                    <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-primary">
-                      Cancellation reason
-                    </span>
-                  ) : null}
-                </div>
-              </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -412,36 +463,78 @@ export function DepartureCard({
                 <div className="mb-2 text-sm font-semibold text-foreground/90">
                   Calling points
                 </div>
-                <div className="grid gap-2">
+                <div className="relative grid gap-2">
+                  <div className="pointer-events-none absolute bottom-4 left-[11px] top-4 w-[2px] rounded-full bg-[linear-gradient(180deg,rgba(120,220,255,0.18),rgba(0,229,255,0.95),rgba(255,80,165,0.82))] shadow-[0_0_10px_rgba(0,229,255,0.6),0_0_24px_rgba(120,220,255,0.4)]" />
                   {service.subsequentCallingPoints[0].callingPoints.map((callingPoint, index) => (
-                    <div
-                      key={`${callingPoint.crs ?? callingPoint.locationName ?? index}`}
-                      className="flex items-baseline justify-between gap-3 rounded-xl border border-border/50 bg-background/10 px-3 py-2"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <Train className="h-3 w-3 text-primary" aria-label="Train stop" />
-                          <span className="truncate text-foreground/90">
-                            {callingPoint.locationName}{' '}
-                            {callingPoint.crs ? (
-                              <span className="font-mono text-xs text-muted-foreground">
-                                ({callingPoint.crs})
-                              </span>
+                    (() => {
+                      const normalizedExpected = normalizeCallingPointStatus(callingPoint.et)
+                      const normalizedScheduled = normalizeCallingPointStatus(callingPoint.st)
+                      const isDelayedCallingPoint = Boolean(
+                        normalizedExpected &&
+                          normalizedScheduled &&
+                          normalizedExpected !== 'on time' &&
+                          normalizedExpected !== normalizedScheduled &&
+                          !callingPoint.isCancelled,
+                      )
+                      const isOnTimeCallingPoint = Boolean(
+                        normalizedExpected === 'on time' ||
+                          (normalizedExpected &&
+                            normalizedScheduled &&
+                            normalizedExpected === normalizedScheduled &&
+                            !callingPoint.isCancelled),
+                      )
+
+                      const hasPulse = Boolean(
+                        isDelayedCallingPoint &&
+                          !callingPoint.isCancelled,
+                      )
+
+                      return (
+                        <div
+                          key={`${callingPoint.crs ?? callingPoint.locationName ?? index}`}
+                          className="grid grid-cols-[24px_minmax(0,1fr)_auto] items-baseline gap-3 rounded-xl border border-border/50 bg-background/10 px-3 py-2"
+                        >
+                          <div className="relative flex h-full items-center justify-center">
+                            {hasPulse ? (
+                              <span className="absolute h-4 w-4 rounded-full border border-red-300/35 animate-[statusPulse_1.1s_ease-out_infinite] bg-red-400/15" />
+                            ) : isOnTimeCallingPoint ? (
+                              <span className="absolute h-4 w-4 rounded-full border border-lime-300/35 bg-lime-400/15" />
                             ) : null}
-                          </span>
+                            <span
+                              className={cn(
+                                'relative z-10 h-3 w-3 rounded-full shadow-[0_0_0_2px_rgba(7,12,20,0.92)]',
+                                isDelayedCallingPoint
+                                  ? 'border border-red-200/80 bg-red-400 shadow-[0_0_0_2px_rgba(7,12,20,0.92),0_0_12px_rgba(248,113,113,0.95),0_0_24px_rgba(239,68,68,0.65)]'
+                                  : isOnTimeCallingPoint
+                                    ? 'border border-lime-100/80 bg-lime-400 shadow-[0_0_0_2px_rgba(7,12,20,0.92),0_0_12px_rgba(163,230,53,0.85),0_0_24px_rgba(132,204,22,0.55)]'
+                                  : 'border border-cyan-100/70 bg-primary shadow-[0_0_0_2px_rgba(7,12,20,0.92),0_0_12px_rgba(0,229,255,0.85),0_0_24px_rgba(120,220,255,0.5)]',
+                              )}
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <Train className="h-3 w-3 text-primary" aria-label="Train stop" />
+                              <span className="truncate text-foreground/90">
+                                {callingPoint.locationName}{' '}
+                                {callingPoint.crs ? (
+                                  <span className="font-mono text-xs text-muted-foreground">
+                                    ({callingPoint.crs})
+                                  </span>
+                                ) : null}
+                              </span>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {formatCallingPointTiming(callingPoint)}
+                            </div>
+                          </div>
+                          <div className="shrink-0 text-right text-xs">
+                            {callingPoint.isCancelled ? (
+                              <span className="text-destructive-foreground">Cancelled</span>
+                            ) : null}
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {callingPoint.st ? `Sched ${callingPoint.st}` : ''}
-                          {callingPoint.et ? ` / Exp ${callingPoint.et}` : ''}
-                          {callingPoint.at ? ` / Act ${callingPoint.at}` : ''}
-                        </div>
-                      </div>
-                      <div className="shrink-0 text-right text-xs">
-                        {callingPoint.isCancelled ? (
-                          <span className="text-destructive-foreground">Cancelled</span>
-                        ) : null}
-                      </div>
-                    </div>
+                      )
+                    })()
                   ))}
                 </div>
               </div>

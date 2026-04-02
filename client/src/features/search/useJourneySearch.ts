@@ -5,7 +5,7 @@ import { toLiveServicePosition } from '../departures/mappers'
 import type { DeparturesResponse } from '../departures/types'
 import type { LiveServicePosition } from '../map/types'
 
-const MIN_SEARCH_DIALOG_MS = 1500
+const MIN_SEARCH_DIALOG_MS = 750
 const LAST_FROM_STORAGE_KEY = 'wheresmetrain:last-from-crs'
 const LAST_TO_STORAGE_KEY = 'wheresmetrain:last-to-crs'
 
