@@ -1,4 +1,20 @@
-import type { DeparturesResponse } from './types'
+import type { DeparturesResponse, DepartureService } from './types'
+
+function normalizeLength(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return undefined
+
+    const parsed = Number(trimmed)
+    return Number.isFinite(parsed) ? parsed : undefined
+  }
+
+  return undefined
+}
 
 function normalizeLocations(locs: any) {
   const locations = Array.isArray(locs) ? locs : locs ? [locs] : []
@@ -36,7 +52,7 @@ function normalizeCallingPoints(groups: any) {
         et: point.et as string | undefined,
         at: point.at as string | undefined,
         isCancelled: point.isCancelled as boolean | undefined,
-        length: point.length as number | undefined,
+        length: normalizeLength(point.length),
         detachFront: point.detachFront as boolean | undefined,
         formation: point.formation as string | undefined,
         adhocAlerts: point.adhocAlerts as string | undefined,
@@ -45,34 +61,40 @@ function normalizeCallingPoints(groups: any) {
   }))
 }
 
+function normalizeService(service: any, fallbackServiceId?: string): DepartureService {
+  const item = service ?? {}
+
+  return {
+    serviceID: (item.serviceID as string | undefined) ?? fallbackServiceId,
+    rsid: item.rsid as string | undefined,
+    serviceType: item.serviceType as string | undefined,
+    operator: item.operator as string | undefined,
+    operatorCode: item.operatorCode as string | undefined,
+    std: item.std as string | undefined,
+    etd: (item.etd as string | undefined) ?? (item.atd as string | undefined),
+    sta: item.sta as string | undefined,
+    eta: (item.eta as string | undefined) ?? (item.ata as string | undefined),
+    platform: item.platform as string | undefined,
+    isCancelled: item.isCancelled as boolean | undefined,
+    cancelReason: item.cancelReason as string | undefined,
+    delayReason: item.delayReason as string | undefined,
+    length: normalizeLength(item.length),
+    detachFront: item.detachFront as boolean | undefined,
+    isCircularRoute: item.isCircularRoute as boolean | undefined,
+    origin: normalizeLocations(item.origin?.location),
+    destination: normalizeLocations(item.destination?.location),
+    subsequentCallingPoints: normalizeCallingPoints(item.subsequentCallingPoints),
+    previousCallingPoints: normalizeCallingPoints(item.previousCallingPoints),
+    raw: service,
+  }
+}
+
 export function normalizeBoardResult(result: any): DeparturesResponse {
   const board = result?.GetStationBoardResult
   const rawServices = board?.trainServices?.service ?? []
   const services = (Array.isArray(rawServices) ? rawServices : [rawServices])
     .filter(Boolean)
-    .map((service: any) => ({
-      serviceID: service.serviceID as string | undefined,
-      rsid: service.rsid as string | undefined,
-      serviceType: service.serviceType as string | undefined,
-      operator: service.operator as string | undefined,
-      operatorCode: service.operatorCode as string | undefined,
-      std: service.std as string | undefined,
-      etd: service.etd as string | undefined,
-      sta: service.sta as string | undefined,
-      eta: service.eta as string | undefined,
-      platform: service.platform as string | undefined,
-      isCancelled: service.isCancelled as boolean | undefined,
-      cancelReason: service.cancelReason as string | undefined,
-      delayReason: service.delayReason as string | undefined,
-      length: service.length as number | undefined,
-      detachFront: service.detachFront as boolean | undefined,
-      isCircularRoute: service.isCircularRoute as boolean | undefined,
-      origin: normalizeLocations(service.origin?.location),
-      destination: normalizeLocations(service.destination?.location),
-      subsequentCallingPoints: normalizeCallingPoints(service.subsequentCallingPoints),
-      previousCallingPoints: normalizeCallingPoints(service.previousCallingPoints),
-      raw: service,
-    }))
+    .map((service: any) => normalizeService(service))
 
   return {
     generatedAt: board?.generatedAt,
@@ -82,4 +104,12 @@ export function normalizeBoardResult(result: any): DeparturesResponse {
     filtercrs: board?.filtercrs,
     services,
   }
+}
+
+export function normalizeServiceDetailsResult(
+  result: any,
+  fallbackServiceId?: string,
+): DepartureService {
+  const service = result?.GetServiceDetailsResult
+  return normalizeService(service, fallbackServiceId)
 }
