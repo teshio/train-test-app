@@ -22,13 +22,6 @@ export function DeparturesList({ from, to, data }: DeparturesListProps) {
         </div>
       </div>
 
-      {data.filterLocationName || data.filtercrs ? (
-        <div className="text-xs text-muted-foreground">
-          Filtered toward {data.filterLocationName ?? 'Unknown'}
-          {data.filtercrs ? ` (${data.filtercrs})` : ''}
-        </div>
-      ) : null}
-
       <div className="grid grid-cols-1 gap-3">
         {data.services.length === 0 ? (
           <Card className="p-5 text-center text-sm text-muted-foreground">
@@ -39,6 +32,7 @@ export function DeparturesList({ from, to, data }: DeparturesListProps) {
             <DepartureCard
               key={service.serviceID ?? `${service.std}-${service.destination?.[0]?.locationName}`}
               service={service}
+              fromStation={from}
               toName={to?.name}
               filterLocationName={data.filterLocationName}
               filterCrs={data.filtercrs}

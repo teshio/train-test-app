@@ -8,6 +8,20 @@ import type { LiveServicePosition } from '../map/types'
 const MIN_SEARCH_DIALOG_MS = 750
 const LAST_FROM_STORAGE_KEY = 'wheresmetrain:last-from-crs'
 const LAST_TO_STORAGE_KEY = 'wheresmetrain:last-to-crs'
+const RECENT_SEARCHES_STORAGE_KEY = 'wheresmetrain:recent-searches'
+const MAX_RECENT_SEARCHES = 8
+
+type StoredRecentSearch = {
+  fromCrs: string
+  toCrs: string
+}
+
+export type RecentSearch = {
+  id: string
+  from: Station
+  to: Station
+  label: string
+}
 
 function toRadians(value: number) {
   return (value * Math.PI) / 180
@@ -52,9 +66,65 @@ function getStoredStation(storageKey: string) {
   return STATIONS.find((station) => station.crs === crs) ?? null
 }
 
+function resolveStation(crs: string) {
+  return STATIONS.find((station) => station.crs === crs) ?? null
+}
+
+function loadRecentSearches(): RecentSearch[] {
+  if (typeof window === 'undefined') return []
+
+  const raw = window.localStorage.getItem(RECENT_SEARCHES_STORAGE_KEY)
+  if (!raw) return []
+
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+
+    return parsed
+      .map((entry) => {
+        if (
+          typeof entry !== 'object' ||
+          entry === null ||
+          typeof (entry as StoredRecentSearch).fromCrs !== 'string' ||
+          typeof (entry as StoredRecentSearch).toCrs !== 'string'
+        ) {
+          return null
+        }
+
+        const from = resolveStation((entry as StoredRecentSearch).fromCrs)
+        const to = resolveStation((entry as StoredRecentSearch).toCrs)
+        if (!from || !to) return null
+
+        return {
+          id: `${from.crs}-${to.crs}`,
+          from,
+          to,
+          label: `${from.name} (${from.crs}) -> ${to.name} (${to.crs})`,
+        }
+      })
+      .filter((entry): entry is RecentSearch => Boolean(entry))
+  } catch {
+    return []
+  }
+}
+
+function saveRecentSearches(searches: RecentSearch[]) {
+  if (typeof window === 'undefined') return
+
+  const serializable = searches.map((search) => ({
+    fromCrs: search.from.crs,
+    toCrs: search.to.crs,
+  }))
+  window.localStorage.setItem(
+    RECENT_SEARCHES_STORAGE_KEY,
+    JSON.stringify(serializable.slice(0, MAX_RECENT_SEARCHES)),
+  )
+}
+
 export type JourneySearchModel = {
   from: Station | null
   to: Station | null
+  recentSearches: RecentSearch[]
   loading: boolean
   showSearchDialog: boolean
   error: string | null
@@ -67,11 +137,13 @@ export type JourneySearchModel = {
   swapStations: () => void
   reset: () => void
   useCurrentLocation: () => void
+  applyRecentSearch: (searchId: string) => void
 }
 
 export function useJourneySearch(): JourneySearchModel {
   const [from, setFrom] = useState<Station | null>(() => getStoredStation(LAST_FROM_STORAGE_KEY))
   const [to, setTo] = useState<Station | null>(() => getStoredStation(LAST_TO_STORAGE_KEY))
+  const [recentSearches, setRecentSearches] = useState<RecentSearch[]>(() => loadRecentSearches())
   const [loading, setLoading] = useState(false)
   const [showSearchDialog, setShowSearchDialog] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -150,6 +222,16 @@ export function useJourneySearch(): JourneySearchModel {
     setError(null)
   }
 
+  function applyRecentSearch(searchId: string) {
+    const selectedSearch = recentSearches.find((entry) => entry.id === searchId)
+    if (!selectedSearch) return
+
+    setFrom(selectedSearch.from)
+    setTo(selectedSearch.to)
+    setData(null)
+    setError(null)
+  }
+
   function useCurrentLocation() {
     if (!navigator.geolocation) {
       setError('This device does not support location access.')
@@ -196,9 +278,29 @@ export function useJourneySearch(): JourneySearchModel {
     )
   }
 
+  useEffect(() => {
+    saveRecentSearches(recentSearches)
+  }, [recentSearches])
+
+  useEffect(() => {
+    if (!data || !from || !to) return
+
+    setRecentSearches((current) => {
+      const nextEntry: RecentSearch = {
+        id: `${from.crs}-${to.crs}`,
+        from,
+        to,
+        label: `${from.name} (${from.crs}) -> ${to.name} (${to.crs})`,
+      }
+      const deduped = current.filter((entry) => entry.id !== nextEntry.id)
+      return [nextEntry, ...deduped].slice(0, MAX_RECENT_SEARCHES)
+    })
+  }, [data, from, to])
+
   return {
     from,
     to,
+    recentSearches,
     loading,
     showSearchDialog,
     error,
@@ -211,5 +313,6 @@ export function useJourneySearch(): JourneySearchModel {
     swapStations,
     reset,
     useCurrentLocation,
+    applyRecentSearch,
   }
 }
